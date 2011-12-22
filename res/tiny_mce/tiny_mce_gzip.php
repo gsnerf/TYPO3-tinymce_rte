@@ -22,7 +22,13 @@
 	$compress = getParam("compress", "true") == "true";
 	$core = getParam("core", "true") == "true";
 	$suffix = getParam("suffix", "_src") == "_src" ? "_src" : "";
-	$cachePath = "../../../../../typo3temp/tinymce_rte/"; // Cache path, this is where the .gz files will be stored
+        $cic_pathToScript = $_SERVER['SCRIPT_FILENAME'];
+        $cic_pathParts = explode('/',$cic_pathToScript);
+        for ($i=0; $i <= 5; $i++) {
+                array_pop($cic_pathParts);
+        }
+        $cic_basePath = implode('/',$cic_pathParts);
+        $cachePath = $cic_basePath.'/typo3temp/tinymce_rte';
 	if( !is_dir($cachePath) ) {
 		mkdir( $cachePath );
 	}
