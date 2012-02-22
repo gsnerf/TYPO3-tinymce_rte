@@ -51,6 +51,8 @@ require_once (PATH_t3lib.'class.t3lib_recordlist.php');
 require_once ($BACK_PATH.'class.db_list.inc');
 require_once ($BACK_PATH.'class.db_list_extra.inc');
 
+require_once ('../class.tx_tinymce_rte_base.php');
+
 class tinymce_rte_template extends template {
 
 }
@@ -70,7 +72,7 @@ class TBE_browser_recordList extends localRecordList {
 	 *
 	 * @return	void
 	 */
-	function TBE_browser_recordList () {
+	function __construct() {
 		$this->thisScript = t3lib_div::getIndpEnv('SCRIPT_NAME');
 	}
 	
@@ -179,7 +181,7 @@ class localPageTree extends t3lib_browseTree {
 	 *
 	 * @return	void
 	 */
-	function localPageTree() {
+	function __construct() {
 		$this->thisScript = t3lib_div::getIndpEnv('SCRIPT_NAME');
 		$this->init();
 
@@ -368,7 +370,7 @@ class localFolderTree extends t3lib_folderTree {
 	 *
 	 * @return	void
 	 */
-	function localFolderTree() {
+	function __construct() {
 		$this->thisScript = t3lib_div::getIndpEnv('SCRIPT_NAME');
 		$this->t3lib_folderTree();
 	}
@@ -871,21 +873,26 @@ RTE.default.linkhandler {
 				function link_insert(value,anchor)	{
 					if (!anchor) anchor = "";
 					var win = tinyMCEPopup.getWindowArg("window");
-					if (win)
+					if (win) {
 						win.document.getElementById(tinyMCEPopup.getWindowArg("input")).value = value + anchor;
-					else
+					}	else {
 						directSetHref( value + anchor );
-					  
+					}
 			';
 			//miss use bparams
 			if(t3lib_div::_GP('bparams') == 'media') {
 				$JScode .= '
 					// for media browsers: update media preview
-					win.updatePreview();
+					win.document.getElementById(tinyMCEPopup.getWindowArg("input")).onchange();
+					// win.Media.formToData();
+					
+					if (tinyMCE.activeEditor.selection.getContent() === "") {
+						tinyMCE.activeEditor.selection.select(tinyMCE.activeEditor.dom.select("p")[0]); // xxx no fucking clue why this is needed; but otherwise if nothing is select in the main text it will not insert the correct html code into the editor...
+					}
 				';
 			}
 			$JScode .= '
-					tinyMCEPopup.close(); 
+					tinyMCEPopup.close();
 					return false;
 				}
 				
@@ -1630,7 +1637,7 @@ RTE.default.linkhandler {
 		}
 
 			// Draw the record list IF there is a page id to expand:
-		if ($expPageId && t3lib_div::testInt($expPageId) && $BE_USER->isInWebMount($expPageId))	{
+		if ($expPageId && tx_tinymce_rte_base::testInt($expPageId) && $BE_USER->isInWebMount($expPageId))	{
 
 				// Create header for listing, showing the page title/icon:
 			$titleLen=intval($GLOBALS['BE_USER']->uc['titleLen']);
@@ -1642,11 +1649,13 @@ RTE.default.linkhandler {
 			$queries = array('tt_content.' => array('sorting' => 'colpos,sorting', 'select' => 'uid,header,hidden,starttime,endtime,fe_group,CType,colpos,bodytext' ));
 			if( is_array($this->thisConfig['linkhandler.']) ) {
 				foreach ($this->thisConfig['linkhandler.'] as $k => $v) {
-					if (is_array($this->thisConfig['linkhandler.'][$k][$this->expandPage . '.'])) {
-						$queries = array_merge($queries, array($k => $this->thisConfig['linkhandler.'][$k][$this->expandPage . '.']));
-					}
-					else if (is_array($this->thisConfig['linkhandler.'][$k]['default.'])) {
-						$queries = array_merge($queries, array($k => $this->thisConfig['linkhandler.'][$k]['default.']));
+					$tcaTable = substr($k,0,-1);
+					if (is_array($GLOBALS['TCA'][$tcaTable])){
+						if (is_array($this->thisConfig['linkhandler.'][$k][$this->expandPage . '.'])) {
+							$queries = array_merge($queries, array($k => $this->thisConfig['linkhandler.'][$k][$this->expandPage . '.']));
+						}  else if (is_array($this->thisConfig['linkhandler.'][$k]['default.'])) {
+							$queries = array_merge($queries, array($k => $this->thisConfig['linkhandler.'][$k]['default.']));
+						}
 					}
 				}
 			}
@@ -1732,7 +1741,7 @@ RTE.default.linkhandler {
 	function TBE_expandPage($tables)	{
 		global $TCA,$BE_USER,$BACK_PATH;
 		$out='';
-		if ($this->expandPage>=0 && t3lib_div::testInt($this->expandPage) && $BE_USER->isInWebMount($this->expandPage))	{
+		if ($this->expandPage>=0 && tx_tinymce_rte_base::testInt($this->expandPage) && $BE_USER->isInWebMount($this->expandPage))	{
 
 				// Set array with table names to list:
 			if (!strcmp(trim($tables),'*'))	{
@@ -2209,7 +2218,7 @@ RTE.default.linkhandler {
 	 * @return	boolean		If the input path is found in PATH_site then it returns true.
 	 */
 	function isWebFolder($folder)	{
-		$folder = ereg_replace('\/$','',$folder).'/';
+		$folder = preg_replace('#\/$#','',$folder).'/';
 		return t3lib_div::isFirstPartOfStr($folder,PATH_site) ? TRUE : FALSE;
 	}
 
@@ -2230,7 +2239,7 @@ RTE.default.linkhandler {
 	 * @return	boolean		If the input path is found in the backend users filemounts and if the filemount is of type readonly, then return true.
 	 */
 	function isReadOnlyFolder($folder) {
-		return ($GLOBALS['FILEMOUNTS'][$this->fileProcessor->checkPathAgainstMounts(ereg_replace('\/$', '', $folder) . '/')]['type'] == 'readonly');
+		return ($GLOBALS['FILEMOUNTS'][$this->fileProcessor->checkPathAgainstMounts(preg_replace('#\/$#', '', $folder) . '/')]['type'] == 'readonly');
  	}
 
 	/**	 * Prints a 'header' where string is in a tablecell
@@ -2328,7 +2337,7 @@ RTE.default.linkhandler {
 						$id = $pp[1];
 						if ($id)	{
 								// Checking if the id-parameter is an alias.
-							if (!t3lib_div::testInt($id))	{
+							if (!tx_tinymce_rte_base::testInt($id))	{
 								list($idPartR) = t3lib_BEfunc::getRecordsByField('pages','alias',$id);
 								$id=intval($idPartR['uid']);
 							}

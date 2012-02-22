@@ -31,9 +31,12 @@ RTE.default {
 		# in the imagebrowser how big should the thumbnails be
 		thumbs.width = 200
 		thumbs.height = 150
-		# defines the maximum allowed image size if you create a plain image
+		# defines the maximum allowed image size you can SELECT while creating an plain image
 		maxPlainImages.width = 1000
 		maxPlainImages.height = 1000
+		# defines the initial max image size of the inserted magic image
+		maxMagicImages.width = 400
+		maxMagicImages.height = 400
 	}
 }
 
@@ -81,7 +84,7 @@ RTE.default.proc {
 	# b and i will be remapped on exit (see below).
 	allowTags (
 		a, abbr, acronym, address, blockquote, b, br, caption, cite, code, dd, div, dl, dt, em, embed,
-		h1, h2, h3, h4, h5, h6, hr, i, img, li, link, object, ol, p, param, pre, q,
+		h1, h2, h3, h4, h5, h6, hr, i, iframe, img, li, link, object, ol, p, param, pre, q,
 		span, strong, sub, sup, table, tbody, td, th, tr, tt, ul
 	)
 
