@@ -1694,7 +1694,7 @@ RTE.default.linkhandler {
 
 				// Initialize the record listing:
 			$id = $this->expandPage;
-			$pointer = t3lib_div::intInRange($this->pointer,0,100000);
+			$pointer = \TYPO3\CMS\Core\Utility\MathUtility::isIntegerInRange($this->pointer,0,100000);
 			$perms_clause = $GLOBALS['BE_USER']->getPagePermsClause(1);
 			$pageinfo = t3lib_BEfunc::readPageAccess($id,$perms_clause);
 			$table='';
