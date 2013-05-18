@@ -61,7 +61,8 @@ class localFolderTree extends t3lib_folderTree {
 	 */
 	function wrapTitle($title,$v)	{
 		if ($this->ext_isLinkable($v))	{
-			$aOnClick = 'return jumpToUrl(\'?expandFolder='.rawurlencode($v['path']).'\');';
+			$path = PATH_site . $v['folder']->getPublicUrl();
+			$aOnClick = 'return jumpToUrl(\'?expandFolder='.rawurlencode($path).'\');';
 			return '<a href="#" onclick="'.htmlspecialchars($aOnClick).'">'.$title.'</a>';
 		} else {
 			return '<span class="typo3-dimmed">'.$title.'</span>';
