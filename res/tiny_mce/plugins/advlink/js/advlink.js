@@ -3,7 +3,7 @@
 tinyMCEPopup.requireLangPack();
 
 var templates = {
-	"window.open" : "window.open('${url}','${target}','${options}')"
+	"window.open" : "window.open(${url},'${target}','${options}')"
 };
 
 function preinit() {
@@ -57,7 +57,7 @@ function init() {
 	if (elm != null && elm.nodeName == "A")
 		action = "update";
 
-	formObj.insert.value = tinyMCEPopup.getLang(action, 'Insert', true); 
+	formObj.insert.value = tinyMCEPopup.getLang(action, 'Insert', true);
 
 	setPopupControlsDisabled(true);
 
@@ -208,7 +208,6 @@ function setPopupControlsDisabled(state) {
 
 function parseLink(link) {
 	link = link.replace(new RegExp('&#39;', 'g'), "'");
-
 	var fnName = link.replace(new RegExp("\\s*([A-Za-z0-9\.]*)\\s*\\(.*", "gi"), "$1");
 
 	// Is function name a template function
@@ -216,14 +215,19 @@ function parseLink(link) {
 	if (template) {
 		// Build regexp
 		var variableNames = template.match(new RegExp("'?\\$\\{[A-Za-z0-9\.]*\\}'?", "gi"));
+
 		var regExp = "\\s*[A-Za-z0-9\.]*\\s*\\(";
 		var replaceStr = "";
 		for (var i=0; i<variableNames.length; i++) {
+
 			// Is string value
-			if (variableNames[i].indexOf("'${") != -1)
-				regExp += "'(.*)'";
-			else // Number value
+      if(variableNames[i] == '${url}' && fnName == 'window.open') {
+        regExp += "(this.href)";
+      } else if (variableNames[i].indexOf("'${") != -1) {
+        regExp += "'(.*)'";
+      } else { // Number value
 				regExp += "([0-9]*)";
+      }
 
 			replaceStr += "$" + (i+1);
 
@@ -242,7 +246,9 @@ function parseLink(link) {
 		// Build variable array
 		var variables = [];
 		variables["_function"] = fnName;
+
 		var variableValues = link.replace(new RegExp(regExp, "gi"), replaceStr).split('<delim>');
+
 		for (var i=0; i<variableNames.length; i++)
 			variables[variableNames[i]] = variableValues[i];
 
@@ -282,10 +288,10 @@ function buildOnClick() {
 		return;
 	}
 
-	var onclick = "window.open('";
-	var url = formObj.popupurl.value;
+	var onclick = "window.open(";
+	var url = 'this.href';
 
-	onclick += url + "','";
+	onclick += url + ",'";
 	onclick += formObj.popupname.value + "','";
 
 	if (formObj.popuplocation.checked)
@@ -342,7 +348,7 @@ function buildOnClick() {
 	formObj.onclick.value = onclick;
 
 	if (formObj.href.value == "")
-		formObj.href.value = url;
+		formObj.href.value = '#';
 }
 
 function setAttrib(elm, attrib, value) {

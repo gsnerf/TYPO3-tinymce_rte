@@ -61,7 +61,8 @@ class localFolderTree extends t3lib_folderTree {
 	 */
 	function wrapTitle($title,$v)	{
 		if ($this->ext_isLinkable($v))	{
-			$aOnClick = 'return jumpToUrl(\'?expandFolder='.rawurlencode($v['path']).'\');';
+			$path = PATH_site . $v['folder']->getPublicUrl();
+			$aOnClick = 'return jumpToUrl(\'?expandFolder='.rawurlencode($path).'\');';
 			return '<a href="#" onclick="'.htmlspecialchars($aOnClick).'">'.$title.'</a>';
 		} else {
 			return '<span class="typo3-dimmed">'.$title.'</span>';
@@ -230,9 +231,8 @@ class SC_rte_select_image {
 				if (@is_dir($destPath))	{
 					$destName = $fileFunc->getUniqueName($basename,$destPath);
 					@copy($imgInfo[3],$destName);
-
-					$cHeight=t3lib_div::intInRange(t3lib_div::_GP("cHeight"),0,$this->thisConfig['typo3filemanager.']['maxMagicImages.']['height']);
-					$cWidth=t3lib_div::intInRange(t3lib_div::_GP("cWidth"),0,$this->thisConfig['typo3filemanager.']['maxMagicImages.']['width']);
+					$cHeight = \TYPO3\CMS\Core\Utility\MathUtility::isIntegerInRange(t3lib_div::_GP("cHeight"), 0, $this->thisConfig['typo3filemanager.']['maxMagicImages.']['height']);
+					$cWidth = \TYPO3\CMS\Core\Utility\MathUtility::isIntegerInRange(t3lib_div::_GP("cWidth"),0,$this->thisConfig['typo3filemanager.']['maxMagicImages.']['width']);
 					if (!$cHeight)	$cHeight=$this->thisConfig['typo3filemanager.']['maxMagicImages.']['height'];
 					if (!$cWidth)	$cWidth=$this->thisConfig['typo3filemanager.']['maxMagicImages.']['width'];
 		//			debug(array($cHeight,$cWidth));
