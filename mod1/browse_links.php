@@ -1624,7 +1624,7 @@ RTE.default.linkhandler {
 					$out.='<tr ' . $current . '><td style="width: 20px;"><img' . \TYPO3\CMS\Backend\Utility\IconUtility::skinImg($BACK_PATH, 'gfx/ol/join' . ($c == $cc ? 'bottom' : '') . '.gif', 'width="18" height="16"') . ' alt="" /></td>';
 
 					$out .= '<td style="width: 18px;">' . $icon . '</td>';
-					if ($currentTable == 'tt_content') {
+					if( $currentTable == 'tt_content' && !$this->thisConfig['linkhandler.']['tt_content.']) {
 						$out .= '<td><a href="#" onclick="return link_insert(\'' . $expPageId . '\',\'#' . $row['uid'] . '\');" title="' . htmlspecialchars(\TYPO3\CMS\Core\Utility\GeneralUtility::fixed_lgd_cs($titleText, $titleLen)) . '">';
 					} else {
 						$out .= '<td><a href="#" onclick="return record_insert(\'' . $currentTable . '\',\'' . $row['uid'] . '\');" title="' . htmlspecialchars(\TYPO3\CMS\Core\Utility\GeneralUtility::fixed_lgd_cs($titleText, $titleLen)) . '">';
@@ -1697,7 +1697,7 @@ RTE.default.linkhandler {
 
 			// Initialize the record listing:
 			$id = $this->expandPage;
-			$pointer = \TYPO3\CMS\Core\Utility\GeneralUtility::intInRange($this->pointer, 0, 100000);
+			$pointer = \TYPO3\CMS\Core\Utility\MathUtility::isIntegerInRange($this->pointer,0,100000);
 			$perms_clause = $GLOBALS['BE_USER']->getPagePermsClause(1);
 			$pageinfo = \TYPO3\CMS\Backend\Utility\BackendUtility::readPageAccess($id, $perms_clause);
 			$table = '';

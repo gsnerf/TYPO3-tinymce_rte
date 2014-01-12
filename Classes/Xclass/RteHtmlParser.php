@@ -256,176 +256,176 @@ class RteHtmlParser extends \TYPO3\CMS\Core\Html\RteHtmlParser {
 	 * @return string Processed content
 	 * @todo Define visibility
 	 */
-	public function TS_images_db($value) {
-		// Split content by <img> tags and traverse the resulting array for processing:
-		$imgSplit = $this->splitTags('img', $value);
-		foreach ($imgSplit as $k => $v) {
-			// image found, do processing:
-			if ($k % 2) {
-				// Init
-				$attribArray = $this->get_tag_attributes_classic($v, 1);
-				$siteUrl = $this->siteUrl();
-				$sitePath = str_replace(\TYPO3\CMS\Core\Utility\GeneralUtility::getIndpEnv('TYPO3_REQUEST_HOST'), '', $siteUrl);
-				// It's always a absolute URL coming from the RTE into the Database.
-				$absRef = trim($attribArray['src']);
-				// Make path absolute if it is relative and we have a site path wich is not '/'
-				$pI = pathinfo($absRef);
-				if ($sitePath and !$pI['scheme'] && \TYPO3\CMS\Core\Utility\GeneralUtility::isFirstPartOfStr($absRef, $sitePath)) {
-					// If site is in a subpath (eg. /~user_jim/) this path needs to be removed because it will be added with $siteUrl
-					$absRef = substr($absRef, strlen($sitePath));
-					$absRef = $siteUrl . $absRef;
-				}
-				// External image from another URL? In that case, fetch image (unless disabled feature).
-				if (!\TYPO3\CMS\Core\Utility\GeneralUtility::isFirstPartOfStr($absRef, $siteUrl) && !$this->procOptions['dontFetchExtPictures']) {
-					// Get it
-					$externalFile = $this->getUrl($absRef);
-					if ($externalFile) {
-						$pU = parse_url($absRef);
-						$pI = pathinfo($pU['path']);
-						if (\TYPO3\CMS\Core\Utility\GeneralUtility::inList('gif,png,jpeg,jpg', strtolower($pI['extension']))) {
-							$fileName = \TYPO3\CMS\Core\Utility\GeneralUtility::shortMD5($absRef) . '.' . $pI['extension'];
-							$folder = \TYPO3\CMS\Core\Resource\ResourceFactory::getInstance()->getFolderObjectFromCombinedIdentifier($this->rteImageStorageDir());
-							if ($folder instanceof \TYPO3\CMS\Core\Resource\Folder) {
-								$fileObject = $folder->createFile($fileName)->setContents($externalFile);
-								/** @var $magicImageService \TYPO3\CMS\Core\Resource\Service\MagicImageService */
-								$magicImageService = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance('TYPO3\\CMS\\Core\\Resource\\Service\\MagicImageService');
-								$imageConfiguration = array(
-									'width' => $attribArray['width'],
-									'height' => $attribArray['height'],
-									'maxW' => 300,
-									'maxH' => 1000
-								);
-								$magicImage = $magicImageService->createMagicImage($fileObject, $imageConfiguration, $this->rteImageStorageDir());
-								if ($magicImage instanceof \TYPO3\CMS\Core\Resource\FileInterface) {
-									$filePath = $magicImage->getForLocalProcessing(FALSE);
-									$imageInfo = @getimagesize($filePath);
-									$attribArray['width'] = $imageInfo[0];
-									$attribArray['height'] = $imageInfo[1];
-									$attribArray['data-htmlarea-file-uid'] = $fileObject->getUid();
-									$absRef = $siteUrl . substr($filePath, strlen(PATH_site));
-								}
-								$attribArray['src'] = $absRef;
-								$params = \TYPO3\CMS\Core\Utility\GeneralUtility::implodeAttributes($attribArray, 1);
-								$imgSplit[$k] = '<img ' . $params . ' />';
-							}
-						}
-					}
-				}
-				// Check image as local file (siteURL equals the one of the image)
-				// Xclass changed from: if (\TYPO3\CMS\Core\Utility\GeneralUtility::isFirstPartOfStr($absRef, $siteUrl)) {
-				if ( (strpos($absRef, 'http://') === FALSE) AND (strpos($absRef, 'https://') === FALSE) AND (strpos($absRef, 'ftp://') === FALSE) )	{
-					// Rel-path, rawurldecoded for special characters.
-					// Xclass changed from: $path = rawurldecode(substr($absRef, strlen($siteUrl)));
-					$path = $absRef;
-					// Abs filepath, locked to relative path of this project.
-					$filepath = \TYPO3\CMS\Core\Utility\GeneralUtility::getFileAbsFileName($path);
-					// Check file existence (in relative dir to this installation!)
-					if ($filepath && @is_file($filepath)) {
-						// If "magic image":
-						$magicFolder = \TYPO3\CMS\Core\Resource\ResourceFactory::getInstance()->getFolderObjectFromCombinedIdentifier(
-							$this->rteImageStorageDir()
-						);
-						if ($magicFolder instanceof \TYPO3\CMS\Core\Resource\Folder) {
-							$magicFolderPath = $magicFolder->getPublicUrl();
-							$pathPre = $magicFolderPath . 'RTEmagicC_';
-							if (\TYPO3\CMS\Core\Utility\GeneralUtility::isFirstPartOfStr($path, $pathPre)) {
-								// Find original file
-								if ($attribArray['data-htmlarea-file-uid']) {
-									$originalFileObject = \TYPO3\CMS\Core\Resource\ResourceFactory::getInstance()->getFileObject($attribArray['data-htmlarea-file-uid']);
-								} else {
-									// Backward compatibility mode
-									$pI = pathinfo(substr($path, strlen($pathPre)));
-									$filename = substr($pI['basename'], 0, -strlen(('.' . $pI['extension'])));
-									$origFilePath = PATH_site . $magicFolderPath . 'RTEmagicP_' . $filename;
-									if (@is_file($origFilePath)) {
-										$originalFileObject = $magicFolder->addFile($origFilePath, $filename, 'changeName');
-										$attribArray['data-htmlarea-file-uid'] = $originalFileObject->getUid();
-									}
-								}
-								if (!empty($originalFileObject) && $originalFileObject instanceof \TYPO3\CMS\Core\Resource\FileInterface) {
-									/** @var $magicImageService \TYPO3\CMS\Core\Resource\Service\MagicImageService */
-									$magicImageService = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance('TYPO3\\CMS\\Core\\Resource\\Service\\MagicImageService');
-									// Image dimensions of the current image
-									$imageDimensions = @getimagesize($filepath);
-									// Image dimensions as set on the img tag
-									$imgTagDimensions = $this->getWHFromAttribs($attribArray);
-									// If the dimensions have changed, we re-create the magic image
-									if ($imgTagDimensions[0] != $imageDimensions[0] || $imgTagDimensions[1] != $imageDimensions[1]) {
-										$imageConfiguration = array(
-											'width' => $imgTagDimensions[0],
-											'height' => $imgTagDimensions[1],
-											'maxW' => 300,
-											'maxH' => 1000
-										);
-										// TODO: Perhaps the existing magic image should be overridden?
-										$magicImage = $magicImageService->createMagicImage($originalFileObject, $imageConfiguration, $this->rteImageStorageDir());
-										if ($magicImage instanceof \TYPO3\CMS\Core\Resource\FileInterface) {
-											$filePath = $magicImage->getForLocalProcessing(FALSE);
-											$imageInfo = @getimagesize($filePath);
-											// Removing width and height from any style attribute
-											$attribArray['style'] = preg_replace('/((?:^|)\\s*(?:width|height)\\s*:[^;]*(?:$|;))/si', '', $attribArray['style']);
-											$attribArray['width'] = $imageInfo[0];
-											$attribArray['height'] = $imageInfo[1];
-											$attribArray['src'] = $this->siteURL() . substr($filePath, strlen(PATH_site));
-											$params = \TYPO3\CMS\Core\Utility\GeneralUtility::implodeAttributes($attribArray, 1);
-											$imgSplit[$k] = '<img ' . $params . ' />';
-										}
-									}
-								}
-							} elseif ($this->procOptions['plainImageMode']) {
-								// If "plain image" has been configured:
-								// Image dimensions as set in the image tag, if any
-								$curWH = $this->getWHFromAttribs($attribArray);
-								if ($curWH[0]) {
-									$attribArray['width'] = $curWH[0];
-								}
-								if ($curWH[1]) {
-									$attribArray['height'] = $curWH[1];
-								}
-								// Removing width and heigth form style attribute
-								$attribArray['style'] = preg_replace('/((?:^|)\\s*(?:width|height)\\s*:[^;]*(?:$|;))/si', '', $attribArray['style']);
-								// Finding dimensions of image file:
-								$fI = @getimagesize($filepath);
-								// Perform corrections to aspect ratio based on configuration:
-								switch ((string) $this->procOptions['plainImageMode']) {
-								case 'lockDimensions':
-									$attribArray['width'] = $fI[0];
-									$attribArray['height'] = $fI[1];
-									break;
-								case 'lockRatioWhenSmaller':
-									if ($attribArray['width'] > $fI[0]) {
-										$attribArray['width'] = $fI[0];
-									}
-								case 'lockRatio':
-									if ($fI[0] > 0) {
-										$attribArray['height'] = round($attribArray['width'] * ($fI[1] / $fI[0]));
-									}
-									break;
-								}
-								// Compile the image tag again:
-								$params = \TYPO3\CMS\Core\Utility\GeneralUtility::implodeAttributes($attribArray, 1);
-								$imgSplit[$k] = '<img ' . $params . ' />';
-							}
-						}
-					}
-				}
-				// Convert abs to rel url
-				if ($imgSplit[$k]) {
-					$attribArray = $this->get_tag_attributes_classic($imgSplit[$k], 1);
-					$absRef = trim($attribArray['src']);
-					if (\TYPO3\CMS\Core\Utility\GeneralUtility::isFirstPartOfStr($absRef, $siteUrl)) {
-						$attribArray['src'] = $this->relBackPath . substr($absRef, strlen($siteUrl));
-						if (!isset($attribArray['alt'])) {
-							$attribArray['alt'] = '';
-						}
-						// Must have alt-attribute for XHTML compliance.
-						$imgSplit[$k] = '<img ' . \TYPO3\CMS\Core\Utility\GeneralUtility::implodeAttributes($attribArray, 1, 1) . ' />';
-					}
-				}
-			}
-		}
-		return implode('', $imgSplit);
-	}
+//	public function TS_images_db($value) {
+//		// Split content by <img> tags and traverse the resulting array for processing:
+//		$imgSplit = $this->splitTags('img', $value);
+//		foreach ($imgSplit as $k => $v) {
+//			// image found, do processing:
+//			if ($k % 2) {
+//				// Init
+//				$attribArray = $this->get_tag_attributes_classic($v, 1);
+//				$siteUrl = $this->siteUrl();
+//				$sitePath = str_replace(\TYPO3\CMS\Core\Utility\GeneralUtility::getIndpEnv('TYPO3_REQUEST_HOST'), '', $siteUrl);
+//				// It's always a absolute URL coming from the RTE into the Database.
+//				$absRef = trim($attribArray['src']);
+//				// Make path absolute if it is relative and we have a site path wich is not '/'
+//				$pI = pathinfo($absRef);
+//				if ($sitePath and !$pI['scheme'] && \TYPO3\CMS\Core\Utility\GeneralUtility::isFirstPartOfStr($absRef, $sitePath)) {
+//					// If site is in a subpath (eg. /~user_jim/) this path needs to be removed because it will be added with $siteUrl
+//					$absRef = substr($absRef, strlen($sitePath));
+//					$absRef = $siteUrl . $absRef;
+//				}
+//				// External image from another URL? In that case, fetch image (unless disabled feature).
+//				if (!\TYPO3\CMS\Core\Utility\GeneralUtility::isFirstPartOfStr($absRef, $siteUrl) && !$this->procOptions['dontFetchExtPictures']) {
+//					// Get it
+//					$externalFile = $this->getUrl($absRef);
+//					if ($externalFile) {
+//						$pU = parse_url($absRef);
+//						$pI = pathinfo($pU['path']);
+//						if (\TYPO3\CMS\Core\Utility\GeneralUtility::inList('gif,png,jpeg,jpg', strtolower($pI['extension']))) {
+//							$fileName = \TYPO3\CMS\Core\Utility\GeneralUtility::shortMD5($absRef) . '.' . $pI['extension'];
+//							$folder = \TYPO3\CMS\Core\Resource\ResourceFactory::getInstance()->getFolderObjectFromCombinedIdentifier($this->rteImageStorageDir());
+//							if ($folder instanceof \TYPO3\CMS\Core\Resource\Folder) {
+//								$fileObject = $folder->createFile($fileName)->setContents($externalFile);
+//								/** @var $magicImageService \TYPO3\CMS\Core\Resource\Service\MagicImageService */
+//								$magicImageService = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance('TYPO3\\CMS\\Core\\Resource\\Service\\MagicImageService');
+//								$imageConfiguration = array(
+//									'width' => $attribArray['width'],
+//									'height' => $attribArray['height'],
+//									'maxW' => 300,
+//									'maxH' => 1000
+//								);
+//								$magicImage = $magicImageService->createMagicImage($fileObject, $imageConfiguration, $this->rteImageStorageDir());
+//								if ($magicImage instanceof \TYPO3\CMS\Core\Resource\FileInterface) {
+//									$filePath = $magicImage->getForLocalProcessing(FALSE);
+//									$imageInfo = @getimagesize($filePath);
+//									$attribArray['width'] = $imageInfo[0];
+//									$attribArray['height'] = $imageInfo[1];
+//									$attribArray['data-htmlarea-file-uid'] = $fileObject->getUid();
+//									$absRef = $siteUrl . substr($filePath, strlen(PATH_site));
+//								}
+//								$attribArray['src'] = $absRef;
+//								$params = \TYPO3\CMS\Core\Utility\GeneralUtility::implodeAttributes($attribArray, 1);
+//								$imgSplit[$k] = '<img ' . $params . ' />';
+//							}
+//						}
+//					}
+//				}
+//				// Check image as local file (siteURL equals the one of the image)
+//				// Xclass changed from: if (\TYPO3\CMS\Core\Utility\GeneralUtility::isFirstPartOfStr($absRef, $siteUrl)) {
+//				if ( (strpos($absRef, 'http://') === FALSE) AND (strpos($absRef, 'https://') === FALSE) AND (strpos($absRef, 'ftp://') === FALSE) )	{
+//					// Rel-path, rawurldecoded for special characters.
+//					// Xclass changed from: $path = rawurldecode(substr($absRef, strlen($siteUrl)));
+//					$path = $absRef;
+//					// Abs filepath, locked to relative path of this project.
+//					$filepath = \TYPO3\CMS\Core\Utility\GeneralUtility::getFileAbsFileName($path);
+//					// Check file existence (in relative dir to this installation!)
+//					if ($filepath && @is_file($filepath)) {
+//						// If "magic image":
+//						$magicFolder = \TYPO3\CMS\Core\Resource\ResourceFactory::getInstance()->getFolderObjectFromCombinedIdentifier(
+//							$this->rteImageStorageDir()
+//						);
+//						if ($magicFolder instanceof \TYPO3\CMS\Core\Resource\Folder) {
+//							$magicFolderPath = $magicFolder->getPublicUrl();
+//							$pathPre = $magicFolderPath . 'RTEmagicC_';
+//							if (\TYPO3\CMS\Core\Utility\GeneralUtility::isFirstPartOfStr($path, $pathPre)) {
+//								// Find original file
+//								if ($attribArray['data-htmlarea-file-uid']) {
+//									$originalFileObject = \TYPO3\CMS\Core\Resource\ResourceFactory::getInstance()->getFileObject($attribArray['data-htmlarea-file-uid']);
+//								} else {
+//									// Backward compatibility mode
+//									$pI = pathinfo(substr($path, strlen($pathPre)));
+//									$filename = substr($pI['basename'], 0, -strlen(('.' . $pI['extension'])));
+//									$origFilePath = PATH_site . $magicFolderPath . 'RTEmagicP_' . $filename;
+//									if (@is_file($origFilePath)) {
+//										$originalFileObject = $magicFolder->addFile($origFilePath, $filename, 'changeName');
+//										$attribArray['data-htmlarea-file-uid'] = $originalFileObject->getUid();
+//									}
+//								}
+//								if (!empty($originalFileObject) && $originalFileObject instanceof \TYPO3\CMS\Core\Resource\FileInterface) {
+//									/** @var $magicImageService \TYPO3\CMS\Core\Resource\Service\MagicImageService */
+//									$magicImageService = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance('TYPO3\\CMS\\Core\\Resource\\Service\\MagicImageService');
+//									// Image dimensions of the current image
+//									$imageDimensions = @getimagesize($filepath);
+//									// Image dimensions as set on the img tag
+//									$imgTagDimensions = $this->getWHFromAttribs($attribArray);
+//									// If the dimensions have changed, we re-create the magic image
+//									if ($imgTagDimensions[0] != $imageDimensions[0] || $imgTagDimensions[1] != $imageDimensions[1]) {
+//										$imageConfiguration = array(
+//											'width' => $imgTagDimensions[0],
+//											'height' => $imgTagDimensions[1],
+//											'maxW' => 300,
+//											'maxH' => 1000
+//										);
+//										// TODO: Perhaps the existing magic image should be overridden?
+//										$magicImage = $magicImageService->createMagicImage($originalFileObject, $imageConfiguration, $this->rteImageStorageDir());
+//										if ($magicImage instanceof \TYPO3\CMS\Core\Resource\FileInterface) {
+//											$filePath = $magicImage->getForLocalProcessing(FALSE);
+//											$imageInfo = @getimagesize($filePath);
+//											// Removing width and height from any style attribute
+//											$attribArray['style'] = preg_replace('/((?:^|)\\s*(?:width|height)\\s*:[^;]*(?:$|;))/si', '', $attribArray['style']);
+//											$attribArray['width'] = $imageInfo[0];
+//											$attribArray['height'] = $imageInfo[1];
+//											$attribArray['src'] = $this->siteURL() . substr($filePath, strlen(PATH_site));
+//											$params = \TYPO3\CMS\Core\Utility\GeneralUtility::implodeAttributes($attribArray, 1);
+//											$imgSplit[$k] = '<img ' . $params . ' />';
+//										}
+//									}
+//								}
+//							} elseif ($this->procOptions['plainImageMode']) {
+//								// If "plain image" has been configured:
+//								// Image dimensions as set in the image tag, if any
+//								$curWH = $this->getWHFromAttribs($attribArray);
+//								if ($curWH[0]) {
+//									$attribArray['width'] = $curWH[0];
+//								}
+//								if ($curWH[1]) {
+//									$attribArray['height'] = $curWH[1];
+//								}
+//								// Removing width and heigth form style attribute
+//								$attribArray['style'] = preg_replace('/((?:^|)\\s*(?:width|height)\\s*:[^;]*(?:$|;))/si', '', $attribArray['style']);
+//								// Finding dimensions of image file:
+//								$fI = @getimagesize($filepath);
+//								// Perform corrections to aspect ratio based on configuration:
+//								switch ((string) $this->procOptions['plainImageMode']) {
+//								case 'lockDimensions':
+//									$attribArray['width'] = $fI[0];
+//									$attribArray['height'] = $fI[1];
+//									break;
+//								case 'lockRatioWhenSmaller':
+//									if ($attribArray['width'] > $fI[0]) {
+//										$attribArray['width'] = $fI[0];
+//									}
+//								case 'lockRatio':
+//									if ($fI[0] > 0) {
+//										$attribArray['height'] = round($attribArray['width'] * ($fI[1] / $fI[0]));
+//									}
+//									break;
+//								}
+//								// Compile the image tag again:
+//								$params = \TYPO3\CMS\Core\Utility\GeneralUtility::implodeAttributes($attribArray, 1);
+//								$imgSplit[$k] = '<img ' . $params . ' />';
+//							}
+//						}
+//					}
+//				}
+//				// Convert abs to rel url
+//				if ($imgSplit[$k]) {
+//					$attribArray = $this->get_tag_attributes_classic($imgSplit[$k], 1);
+//					$absRef = trim($attribArray['src']);
+//					if (\TYPO3\CMS\Core\Utility\GeneralUtility::isFirstPartOfStr($absRef, $siteUrl)) {
+//						$attribArray['src'] = $this->relBackPath . substr($absRef, strlen($siteUrl));
+//						if (!isset($attribArray['alt'])) {
+//							$attribArray['alt'] = '';
+//						}
+//						// Must have alt-attribute for XHTML compliance.
+//						$imgSplit[$k] = '<img ' . \TYPO3\CMS\Core\Utility\GeneralUtility::implodeAttributes($attribArray, 1, 1) . ' />';
+//					}
+//				}
+//			}
+//		}
+//		return implode('', $imgSplit);
+//	}
 
 
 }
